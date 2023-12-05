@@ -30,7 +30,7 @@ def get_product():
     return jsonify(data)
 
 @app.route('/api/recomended-products', methods=['GET'])
-def get_recomended_products():
+async def get_recomended_products():
     user_id = request.args.get("user_id", default=-1)
 
     if user_id == -1:
@@ -38,7 +38,7 @@ def get_recomended_products():
 
     num_recommendations = 10 
 
-    recommended_indices = get_recommandation(user_id, num_recommendations)
+    recommended_indices = await get_recommandation(user_id, num_recommendations)
     
     # Assuming you have a product mapping or lookup to get product details
     recommended_products = [get_product_details(idx) for idx in recommended_indices]
