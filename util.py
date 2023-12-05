@@ -1,21 +1,18 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
 from scipy import sparse
-from collections import Counter
 
 lmbda = 0.0002
 
 def create_embeddings(n, k):
-    return 11*np.random.random((n, k)) / k
+    return 11 * np.random.random((n, k)) / k
 
 def create_sparse_matrix(df, rows, cols, column_name="Score"):
-    return sparse.csc_matrix((df[column_name].values,(df['UserId'].values, df['ProductId'].values)),shape=(rows, cols))
+    return sparse.csc_matrix((df[column_name].values, (df['UserId'].values, df['ProductId'].values)), shape=(rows, cols))
 
 def encode_column(column):
     keys = column.unique()
-    key_to_id = {key:idx for idx,key in enumerate(keys)}
+    key_to_id = {key: idx for idx, key in enumerate(keys)}
     return key_to_id, np.array([key_to_id[x] for x in column]), len(keys)
 
 def encode_df(df):
@@ -24,20 +21,20 @@ def encode_df(df):
     return df, num_users, num_foods, user_ids, food_ids
 
 def predict(df, emb_user, emb_food):
-    df['prediction'] = np.sum(np.multiply(emb_food[df['ProductId']],emb_user[df['UserId']]), axis=1)
+    df['prediction'] = np.sum(np.multiply(emb_food[df['ProductId']], emb_user[df['UserId']]), axis=1)
     return df
 
 def cost(df, emb_user, emb_food):
     Y = create_sparse_matrix(df, emb_user.shape[0], emb_food.shape[0])
     predicted = create_sparse_matrix(predict(df, emb_user, emb_food), emb_user.shape[0], emb_food.shape[0], 'prediction')
-    return np.sum((Y-predicted).power(2))/df.shape[0] 
+    return np.sum((Y - predicted).power(2)) / df.shape[0]
 
 def gradient(df, emb_user, emb_food):
     Y = create_sparse_matrix(df, emb_user.shape[0], emb_food.shape[0])
     predicted = create_sparse_matrix(predict(df, emb_user, emb_food), emb_user.shape[0], emb_food.shape[0], 'prediction')
-    delta =(Y-predicted)
-    grad_user = (-2/df.shape[0])*(delta*emb_food) + 2*lmbda*emb_user
-    grad_anime = (-2/df.shape[0])*(delta.T*emb_user) + 2*lmbda*emb_food
+    delta = (Y - predicted)
+    grad_user = (-2 / df.shape[0]) * (delta * emb_food) + 2 * lmbda * emb_user
+    grad_anime = (-2 / df.shape[0]) * (delta.T * emb_user) + 2 * lmbda * emb_food
     return grad_user, grad_anime
 
 def gradient_descent(df, emb_user, emb_food, iterations=2000, learning_rate=0.01, df_val=None):
@@ -48,43 +45,31 @@ def gradient_descent(df, emb_user, emb_food, iterations=2000, learning_rate=0.01
     v_food = grad_food
     for i in range(iterations):
         grad_user, grad_food = gradient(df, emb_user, emb_food)
-        v_user = beta*v_user + (1-beta)*grad_user
-        v_food = beta*v_food + (1-beta)*grad_food
-        emb_user = emb_user - learning_rate*v_user
-        emb_food = emb_food - learning_rate*v_food
-        if(not (i+1)%50):
-            print("\niteration", i+1, ":")
-            print("train mse:",  cost(df, emb_user, emb_food))
+        v_user = beta * v_user + (1 - beta) * grad_user
+        v_food = beta * v_food + (1 - beta) * grad_food
+        emb_user = emb_user - learning_rate * v_user
+        emb_food = emb_food - learning_rate * v_food
+        if not (i + 1) % 50:
+            print("\niteration", i + 1, ":")
+            print("train mse:", cost(df, emb_user, emb_food))
             if df_val is not None:
-                print("validation mse:",  cost(df_val, emb_user, emb_food))
+                print("validation mse:", cost(df_val, emb_user, emb_food))
     return emb_user, emb_food
 
 def preprocessing():
-  userBoughtArray = pd.read_csv("user_product_buys.csv").to_numpy()[:,1:-1]
-  userLikedArray = pd.read_csv("user_product_likes.csv").to_numpy()[:,1:-1]
-  userClickedArray = pd.read_csv("user_product_clicks.csv").to_numpy()[:,1:-1]
-  numUsers = userBoughtArray.shape[0]
-  numProducts = userBoughtArray.shape[1]
-  
-  userBoughtDf = pd.DataFrame(columns=["ProductId", "UserId", "Score"])
-  for i in range(numUsers): 
-    for j in range(numProducts):
-      if(userBoughtArray[i][j] != 0): 
-        print(i, j, userBoughtArray[i][j])
-        userBoughtDf.loc[len(userBoughtDf.index)] = [j, i, userBoughtArray[i][j]]
+    userBoughtArray = pd.read_csv("user_product_buys.csv").to_numpy()[:, 1:-1]
+    userLikedArray = pd.read_csv("user_product_likes.csv").to_numpy()[:, 1:-1]
+    userClickedArray = pd.read_csv("user_product_clicks.csv").to_numpy()[:, 1:-1]
+    numUsers = userBoughtArray.shape[0]
+    numProducts = userBoughtArray.shape[1]
 
-  userLikedDf = pd.DataFrame(columns=["ProductId", "UserId", "Score"])
-  for i in range(numUsers): 
-    for j in range(numProducts):
-      if(userLikedArray[i][j] != 0): 
-        print(i, j, userLikedArray[i][j])
-        userLikedDf.loc[len(userLikedDf.index)] = [j, i, userLikedArray[i][j]]
+    def create_df_from_array(data_array):
+        rows, cols = np.where(data_array != 0)
+        scores = data_array[rows, cols]
+        return pd.DataFrame({"ProductId": cols, "UserId": rows, "Score": scores})
 
-  userClickedDf = pd.DataFrame(columns=["ProductId", "UserId", "Score"])
-  for i in range(numUsers): 
-    for j in range(numProducts):
-      if(userClickedArray[i][j] != 0): 
-        print(i, j, userClickedArray[i][j])
-        userClickedDf.loc[len(userClickedDf.index)] = [j, i, userClickedArray[i][j]]
-  return userBoughtDf, userLikedDf, userClickedDf, numUsers, numProducts
+    userBoughtDf = create_df_from_array(userBoughtArray)
+    userLikedDf = create_df_from_array(userLikedArray)
+    userClickedDf = create_df_from_array(userClickedArray)
 
+    return userBoughtDf, userLikedDf, userClickedDf, numUsers, numProducts
